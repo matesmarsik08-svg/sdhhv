@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | SDH Hvožďany</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body.modal-open { overflow: hidden; }
+        .loader { border-top-color: #ef4444; animation: spinner 0.6s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab-active { background-color: #ef4444 !important; color: white !important; }
+        /* Skrytí obsahu před přihlášením */
+        #admin-main-content { display: none; }
+    </style>
+</head>
+
+<body class="bg-slate-100 font-sans text-slate-900"></body>
+
+    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-[300] flex items-center justify-center p-4">
+    <div class="bg-white rounded-[40px] p-10 w-full max-w-md shadow-2xl text-center relative">
+        
+        <i class="fas fa-user-shield text-5xl text-red-600 mb-6"></i>
+        <h2 class="text-2xl font-black uppercase italic mb-2">Administrace</h2>
+        <p class="text-slate-400 text-sm mb-8 font-bold uppercase tracking-widest">Vstup pouze pro členy sboru</p>
+        
+        <input type="password" id="login-pass" placeholder="Zadejte heslo" 
+               class="w-full p-5 rounded-2xl bg-slate-50 border-none ring-2 ring-slate-100 focus:ring-red-600 outline-none mb-4 text-center font-bold text-xl">
+        
+        <button onclick="checkLogin()" class="w-full bg-red-700 hover:bg-red-800 text-white p-5 rounded-2xl font-black uppercase tracking-widest transition shadow-lg mb-6">
+            Vstoupit
+        </button>
+
+        <a href="index.html" class="text-slate-400 hover:text-slate-600 text-xs font-black uppercase tracking-widest transition">
+            <i class="fas fa-chevron-left mr-2"></i>Zpět na hlavní web
+        </a>
+
+        <p id="login-error" class="text-red-600 text-xs font-bold mt-4 uppercase hidden">Nesprávné heslo!</p>
+    </div>
+</div>
+
+    <div id="admin-main-content">
+        <nav class="bg-slate-900 text-white p-6 shadow-xl sticky top-0 z-[50]">
+    <div class="container mx-auto flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <a href="index.html" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-red-700 transition shadow-lg" title="Zpět na web">
+                <i class="fas fa-arrow-left text-sm"></i>
+            </a>
+            
+            <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+                <h1 class="font-black uppercase italic text-xl tracking-tighter">SDH Admin</h1>
+                <button onclick="logout()" class="text-[10px] bg-white/10 hover:bg-red-700 px-3 py-1 rounded-lg uppercase font-bold transition w-fit">Odhlásit</button>
+            </div>
+        </div>
+        
+        <div class="flex bg-slate-800 rounded-xl p-1">
+            <button onclick="switchTab('aktuality')" id="tab-btn-aktuality" class="px-4 py-2 rounded-lg text-xs font-bold uppercase transition">Aktuality</button>
+            <button onclick="switchTab('vyjezdy')" id="tab-btn-vyjezdy" class="px-4 py-2 rounded-lg text-xs font-bold uppercase transition">Výjezdy</button>
+            <button onclick="switchTab('souteze')" id="tab-btn-souteze" class="px-4 py-2 rounded-lg text-xs font-bold uppercase transition">Soutěže</button>
+        </div>
+    </div>
+</nav>
+
+        <div class="container mx-auto px-4 py-8">
+            <div class="flex justify-between items-center mb-8 gap-4">
+                <h2 id="section-title" class="text-2xl font-black uppercase italic text-slate-800">Načítání...</h2>
+                <button onclick="openEditModal(null)" class="bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black shadow-lg transition uppercase text-sm">
+                    + Přidat záznam
+                </button>
+            </div>
+
+            <div id="loading-spinner" class="hidden flex justify-center py-20"><div class="loader rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div></div>
+            <div id="data-list" class="grid gap-4"></div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="fixed inset-0 bg-black/95 z-[200] hidden flex items-end md:items-center justify-center p-0 md:p-6 backdrop-blur-sm" onclick="closeModal()">
+        <div class="bg-white rounded-t-[40px] md:rounded-[40px] w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onclick="event.stopPropagation()">
+            <div class="p-8 border-b bg-white shrink-0">
+                <h3 id="modal-title" class="text-2xl font-black uppercase italic text-slate-900 text-left">Editace</h3>
+            </div>
+            
+            <div class="overflow-y-auto p-6 md:p-8 flex-grow space-y-6 bg-slate-50" id="modal-form-content">
+                <form id="edit-form" class="space-y-6 text-left">
+                    <input type="hidden" id="form-row-id">
+                    <div id="dynamic-fields" class="space-y-6"></div>
+
+                    <div class="bg-red-50 p-6 rounded-3xl border border-red-100">
+                        <label class="block text-[10px] font-black uppercase text-red-700 mb-3 ml-2 tracking-widest">Nahrát nové fotky</label>
+                        <input type="file" id="inp-files" multiple accept="image/*" class="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-red-700 file:text-white hover:file:bg-red-800 cursor-pointer">
+                        <div id="upload-status" class="mt-2 text-[10px] font-bold uppercase text-red-400"></div>
+                        <input type="hidden" id="inp-existing-links">
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-6 border-t bg-white flex space-x-4 shrink-0">
+                <button onclick="closeModal()" class="flex-1 py-4 rounded-2xl font-bold bg-slate-100 uppercase text-xs tracking-widest">Zrušit</button>
+                <button onclick="saveChanges()" id="save-btn" class="flex-1 py-4 rounded-2xl font-black bg-red-700 text-white shadow-lg transition uppercase text-xs tracking-widest">Uložit</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+    aktuality: {
+        url: "https://script.google.com/macros/s/AKfycbxFExarXmDKx_n-eVSqSA5oUVpjs9VIAi91YOsp55m-ekbDDsQKfKAAgcaufIB55uo0/exec",
+        title: "Aktuality",
+        fields: ['Timestamp', 'Datum', 'Titulek', 'Text', 'Foto', 'Odkaz']
+    },
+    vyjezdy: {
+        url: "https://script.google.com/macros/s/AKfycbzdm02yxaYlpNN9MSselI1y-2A_Mjs2ArNfmN5pPqxiQzeHo78e-k7sZZiYhugSNnnN/exec",
+        title: "Výjezdy",
+        fields: ['Timestamp', 'Datum', 'Čas', 'Název', 'Typ', 'Technika', 'Popis', 'Fotky', 'Místo']
+    },
+    souteze: {
+        url: "https://script.google.com/macros/s/AKfycbxL1ed5x9qJJd7v7TxUCPRWqwmLbr5ED_sg0ocjxG-Dv-Ylf-esIg_xEaC4Dc0Jp4Jd/exec", 
+        title: "Soutěže",
+        fields: ['Timestamp', 'Datum', 'Název', 'Místo', 'Kategorie', 'Umístění', 'Popis', 'Fotky']
+    }
+};
+        
+        const PASS = "123"; // Vaše heslo
+        let currentTab = 'aktuality';
+        let allData = [];
+
+        // --- LOGIKA PŘIHLÁŠENÍ ---
+        function checkLogin() {
+            const input = document.getElementById('login-pass').value;
+            const error = document.getElementById('login-error');
+            
+            if (input === PASS) {
+                sessionStorage.setItem('sdh_auth', 'true');
+                initAdmin();
+            } else {
+                error.classList.remove('hidden');
+                setTimeout(() => error.classList.add('hidden'), 2000);
+            }
+        }
+
+        function initAdmin() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-main-content').style.display = 'block';
+            switchTab('aktuality');
+        }
+
+        function logout() {
+            sessionStorage.removeItem('sdh_auth');
+            location.reload();
+        }
+
+        // Kontrola při načtení stránky
+        if (sessionStorage.getItem('sdh_auth') === 'true') {
+            initAdmin();
+        }
+
+        // Umožnění stisku Enter v hesle
+        document.getElementById('login-pass').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') checkLogin();
+        });
+
+        // --- PŮVODNÍ FUNKCE ADMINU ---
+        async function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById('tab-btn-' + tab).classList.add('tab-active');
+            document.getElementById('section-title').innerText = CONFIG[tab].title;
+            loadData();
+        }
+
+        async function loadData() {
+            const list = document.getElementById('data-list');
+            const loader = document.getElementById('loading-spinner');
+            list.innerHTML = ''; loader.classList.remove('hidden');
+
+            try {
+                const res = await fetch(CONFIG[currentTab].url);
+                allData = await res.json();
+                list.innerHTML = allData.slice().reverse().map(item => `
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-center mb-4 hover:border-red-300 transition shadow-sm">
+                        <div class="text-left">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${item.values[1]}</span>
+                            <h4 class="font-black text-lg uppercase italic text-slate-900">
+                                ${currentTab === 'vyjezdy' ? (item.values[3] || 'Nový výjezd bez názvu') : (item.values[2] || 'Aktualita bez titulku')}
+                            </h4>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="openEditModal(${item.rowId})" class="p-4 bg-slate-50 rounded-2xl hover:bg-blue-600 hover:text-white transition text-slate-400"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteRow(${item.rowId})" class="p-4 bg-slate-50 rounded-2xl hover:bg-red-600 hover:text-white transition text-slate-400"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { list.innerHTML = `<p class="p-10 text-center text-red-500 font-bold uppercase tracking-widest">Chyba načítání dat z tabulky.</p>`; }
+            finally { loader.classList.add('hidden'); }
+        }
+
+        function openEditModal(rowId) {
+    const item = rowId ? allData.find(i => i.rowId === rowId) : null;
+    document.getElementById('form-row-id').value = rowId || '';
+    document.getElementById('modal-title').innerText = rowId ? 'Upravit záznam' : 'Nový záznam';
+    
+    const fieldsWrap = document.getElementById('dynamic-fields');
+    
+    if (currentTab === 'aktuality') {
+        fieldsWrap.innerHTML = `
+            <input type="date" id="inp-1" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[1] : ''}">
+            <input type="text" id="inp-2" placeholder="Titulek" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none font-bold" value="${item ? item.values[2] : ''}">
+            <textarea id="inp-3" placeholder="Text zprávy" rows="6" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none resize-none">${item ? item.values[3] : ''}</textarea>
+            <input type="text" id="inp-5" placeholder="Odkaz (volitelný)" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[5] : ''}">
+        `;
+        document.getElementById('inp-existing-links').value = item ? item.values[4] : '';
+    } 
+    else if (currentTab === 'vyjezdy') {
+        const techValues = item ? item.values[5].split(', ') : [];
+        fieldsWrap.innerHTML = `
+            <div class="grid grid-cols-2 gap-4">
+                <input type="date" id="inp-1" class="p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[1] : ''}">
+                <input type="time" id="inp-2" class="p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[2] : ''}">
+            </div>
+            <input type="text" id="inp-3" placeholder="Název zásahu" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none font-bold" value="${item ? item.values[3] : ''}">
+            <select id="inp-4" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none">
+                <option value="Požár" ${item?.values[4]==='Požár'?'selected':''}>Požár</option>
+                <option value="Technická pomoc" ${item?.values[4]==='Technická pomoc'?'selected':''}>Technická pomoc</option>
+                <option value="Záchrana" ${item?.values[4]==='Záchrana'?'selected':''}>Záchrana</option>
+                <option value="Planý poplach" ${item?.values[4]==='Planý poplach'?'selected':''}>Planý poplach</option>
+                <option value="Jiné" ${item?.values[4]==='Jiné'?'selected':''}>Jiné</option>
+            </select>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                ${['Tatra CAS 30/8500/510 S2R', 'Ford Transit', 'Škoda 706 RTHP'].map(t => `
+                    <label class="flex items-center p-3 bg-white rounded-xl ring-1 ring-slate-200 text-[10px] font-bold uppercase">
+                        <input type="checkbox" name="tech" value="${t}" class="mr-2 accent-red-600" ${techValues.includes(t)?'checked':''}> ${t.split(' ')[0]} ${t.split(' ')[1]||''}
+                    </label>
+                `).join('')}
+            </div>
+            <textarea id="inp-6" placeholder="Popis zásahu" rows="4" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none resize-none">${item ? item.values[6] : ''}</textarea>
+            <input type="text" id="inp-8" placeholder="Místo" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[8] : ''}">
+        `;
+        document.getElementById('inp-existing-links').value = item ? item.values[7] : '';
+    }
+    else if (currentTab === 'souteze') {
+        fieldsWrap.innerHTML = `
+            <input type="date" id="inp-1" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[1] : ''}">
+            <input type="text" id="inp-2" placeholder="Název soutěže" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none font-bold" value="${item ? item.values[2] : ''}">
+            <input type="text" id="inp-3" placeholder="Místo konání" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[3] : ''}">
+            <input type="text" id="inp-4" placeholder="Kategorie" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none" value="${item ? item.values[4] : ''}">
+            <input type="text" id="inp-5" placeholder="Umístění (např. 1. místo)" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none font-black text-red-600 uppercase" value="${item ? item.values[5] : ''}">
+            <textarea id="inp-6" placeholder="Popis / hodnocení" rows="4" class="w-full p-4 rounded-2xl ring-1 ring-slate-200 outline-none resize-none">${item ? item.values[6] : ''}</textarea>
+        `;
+        document.getElementById('inp-existing-links').value = item ? item.values[7] : '';
+    }
+
+    document.getElementById('edit-modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+}
+
+        async function saveChanges() {
+    const btn = document.getElementById('save-btn');
+    const fileInput = document.getElementById('inp-files');
+    const status = document.getElementById('upload-status');
+    const rowId = document.getElementById('form-row-id').value;
+    btn.disabled = true;
+
+    let newLinks = [];
+    if (fileInput.files.length > 0) {
+        status.innerText = "Nahrávám fotky...";
+        for (let file of fileInput.files) {
+            const base64 = await toBase64(file);
+            const res = await fetch(CONFIG[currentTab].url, {
+                method: 'POST',
+                body: JSON.stringify({ action: "upload", password: PASS, filename: file.name, file: base64 })
+            });
+            const link = await res.text();
+            if (link.includes("drive.google.com")) newLinks.push(link);
+        }
+    }
+
+    const oldLinks = document.getElementById('inp-existing-links').value;
+    const finalLinks = [oldLinks, ...newLinks].filter(l => l && l !== "OK").join(', ');
+
+    let finalData = [];
+    const timestamp = rowId ? allData.find(i => i.rowId == rowId).values[0] : new Date().toLocaleString();
+
+    if (currentTab === 'aktuality') {
+        finalData = [
+            timestamp,
+            document.getElementById('inp-1').value,
+            document.getElementById('inp-2').value,
+            document.getElementById('inp-3').value,
+            finalLinks,
+            document.getElementById('inp-5').value
+        ];
+    } 
+    else if (currentTab === 'vyjezdy') {
+        const tech = Array.from(document.querySelectorAll('input[name="tech"]:checked')).map(cb => cb.value).join(', ');
+        finalData = [
+            timestamp,
+            document.getElementById('inp-1').value,
+            document.getElementById('inp-2').value,
+            document.getElementById('inp-3').value,
+            document.getElementById('inp-4').value,
+            tech,
+            document.getElementById('inp-6').value,
+            finalLinks,
+            document.getElementById('inp-8').value
+        ];
+    }
+    else if (currentTab === 'souteze') {
+        finalData = [
+            timestamp,
+            document.getElementById('inp-1').value,
+            document.getElementById('inp-2').value,
+            document.getElementById('inp-3').value,
+            document.getElementById('inp-4').value,
+            document.getElementById('inp-5').value,
+            document.getElementById('inp-6').value,
+            finalLinks
+        ];
+    }
+
+    btn.innerText = "Ukládám...";
+    try {
+        await fetch(CONFIG[currentTab].url, { method: 'POST', body: JSON.stringify({ action: rowId ? "update" : "add", password: PASS, rowId: parseInt(rowId), data: finalData }) });
+        closeModal(); 
+        loadData();
+    } catch (e) {
+        alert("Chyba při ukládání do tabulky!");
+    } finally {
+        btn.disabled = false; btn.innerText = "Uložit"; status.innerText = "";
+    }
+}
+
+        const toBase64 = f => new Promise((res, rej) => {
+            const r = new FileReader(); r.readAsDataURL(f);
+            r.onload = () => res(r.result); r.onerror = e => rej(e);
+        });
+
+        async function deleteRow(rowId) {
+            if (!confirm('Opravdu chcete tento záznam smazat z tabulky?')) return;
+            await fetch(CONFIG[currentTab].url, { method: 'POST', body: JSON.stringify({ action: "delete", password: PASS, rowId: rowId }) });
+            loadData();
+        }
+
+        function closeModal() { document.getElementById('edit-modal').classList.add('hidden'); document.body.classList.remove('modal-open'); }
+        
+    </script>
+</body>
+</html>
